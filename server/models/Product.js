@@ -12,10 +12,13 @@ const productSchema = new mongoose.Schema({
   mediaUrl: String,
   mediaType: String,
 
+  publicId: String,
+
   createdAt: {
     type: Date,
     default: Date.now
   }
 });
 
-module.exports = mongoose.model("Product", productSchema);
+module.exports =
+  mongoose.model("Product", productSchema);
