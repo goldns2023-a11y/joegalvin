@@ -1,11 +1,12 @@
-const AWS = require("aws-sdk");
+const cloudinary = require("cloudinary").v2;
 
-const s3 = new AWS.S3({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION
-});
 const Product = require("../models/Product");
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 // CREATE
 exports.createProduct = async (req, res) => {
@@ -27,7 +28,8 @@ exports.createProduct = async (req, res) => {
       delivery: req.body.delivery,
       description: req.body.description,
 
-      mediaUrl: file.location,
+      mediaUrl: file.path,
+      publicId: file.filename,
       mediaType: file.mimetype.startsWith("video") ? "video" : "image"
     });
 
@@ -54,7 +56,6 @@ exports.getProduct = async (req, res) => {
 
 // DELETE
 exports.deleteProduct = async (req, res) => {
-
   try {
 
     const product =
@@ -66,18 +67,19 @@ exports.deleteProduct = async (req, res) => {
       });
     }
 
-    // Extract S3 key
-    const urlParts =
-      product.mediaUrl.split(".amazonaws.com/");
+    await cloudinary.uploader.destroy(
+      product.publicId,
+      {
+        resource_type:
+          product.mediaType === "video"
+            ? "video"
+            : "image"
+      }
+    );
 
-    const key = urlParts[1];
-
-    await s3.deleteObject({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key
-    }).promise();
-
-    await Product.findByIdAndDelete(req.params.id);
+    await Product.findByIdAndDelete(
+      req.params.id
+    );
 
     res.json({
       message: "Deleted successfully"
@@ -90,7 +92,6 @@ exports.deleteProduct = async (req, res) => {
     });
 
   }
-
 };
 
 // UPDATE
@@ -107,27 +108,30 @@ exports.updateProduct = async (req, res) => {
     }
 
     let mediaUrl = existing.mediaUrl;
-    let mediaType = existing.mediaType;
-
+let mediaType = existing.mediaType;
+let publicId = existing.publicId;
     // New media uploaded
     if (req.file) {
 
-      // delete old S3 media
-      const oldKey =
-        existing.mediaUrl.split(".amazonaws.com/")[1];
-
-      await s3.deleteObject({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: oldKey
-      }).promise();
-
-      mediaUrl = req.file.location;
-
-      mediaType =
-        req.file.mimetype.startsWith("video")
+  await cloudinary.uploader.destroy(
+    existing.publicId,
+    {
+      resource_type:
+        existing.mediaType === "video"
           ? "video"
-          : "image";
+          : "image"
     }
+  );
+
+  mediaUrl = req.file.path;
+
+  mediaType =
+    req.file.mimetype.startsWith("video")
+      ? "video"
+      : "image";
+
+  publicId = req.file.filename;
+}
 
     const updated =
       await Product.findByIdAndUpdate(
@@ -147,7 +151,8 @@ exports.updateProduct = async (req, res) => {
           delivery: req.body.delivery,
           description: req.body.description,
           mediaUrl,
-          mediaType
+          mediaType,
+          publicId
         },
         { new: true }
       );
