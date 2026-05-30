@@ -1,23 +1,26 @@
 const multer = require("multer");
-const AWS = require("aws-sdk");
-const multerS3 = require("multer-s3");
-require("dotenv").config();
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("cloudinary").v2;
 
-const s3 = new AWS.S3({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-const upload = multer({
-  storage: multerS3({
-    s3: s3,
-    bucket: process.env.AWS_BUCKET_NAME,
-    contentType: multerS3.AUTO_CONTENT_TYPE,
-    key: function (req, file, cb) {
-      cb(null, `products/${Date.now()}-${file.originalname}`);
-    }
-  })
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => {
+
+    const isVideo =
+      file.mimetype.startsWith("video");
+
+    return {
+      folder: "joegalvin",
+      resource_type: isVideo ? "video" : "image",
+      public_id: `${Date.now()}-${file.originalname}`
+    };
+  }
 });
 
-module.exports = upload;
+module.exports = multer({ storage });
