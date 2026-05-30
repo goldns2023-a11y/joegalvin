@@ -12,6 +12,12 @@ exports.createProduct = async (req, res) => {
   try {
     const file = req.file;
 
+    if (!file) {
+      return res.status(400).json({
+        error: "File upload failed (S3 or multer issue)"
+      });
+    }
+
     const newProduct = new Product({
       name: req.body.name,
       price: req.body.price,
@@ -26,9 +32,10 @@ exports.createProduct = async (req, res) => {
     });
 
     await newProduct.save();
-    res.json(newProduct);
+    res.status(201).json(newProduct);
 
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
